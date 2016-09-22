@@ -1,0 +1,15 @@
+# Ignore everything
+*
+!.gitignore
+gitignore
+
+#Except these files
+!bootstrap/
+!bootstrap/app.php
+
+!app/
+!app/*
+!app/*/*
+!app/*/*/*
+!app/*/*/*/*
+!app/*/*/*/*/*
