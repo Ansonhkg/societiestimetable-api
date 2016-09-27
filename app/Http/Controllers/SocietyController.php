@@ -290,6 +290,9 @@ class SocietyController extends Controller{
         // Monday: 8-10 pm @ Great Hall A35
         if($format_2 = self::format_2($string, $input_line)) return $format_2;
 
+        // Wednesdays 18:00-20:00
+        if($format_aikido = self::format_aikido($string, $input_line)) return $format_aikido;
+
         return;
     }
     
@@ -300,6 +303,7 @@ class SocietyController extends Controller{
     * Monday, 14:00-16:00, Georege Fox
     */
     public function format_default($string, $input_line){
+
         preg_match("/(".$string.")[,|:|\s]*(\d*[.|:]\d*-\d*[.|:]\d*),.([^-|<|(]*)/i", $input_line, $output);
         
         if(empty($output)) return;
@@ -318,6 +322,7 @@ class SocietyController extends Controller{
     * Monday: 8-10 pm @ Great Hall A35
     */
     public function format_2($string, $input_line){
+
         preg_match("/(".$string.")[,|:|\s]*(\d*[^abc|0-9]\d*[.|\s][am|pm]*)[.|\s]*@[.|\s]([^-|]*)/i", $input_line, $output);
         
         if(empty($output)) return;
@@ -335,6 +340,30 @@ class SocietyController extends Controller{
 
         return $day;
     }
+
+    /*
+    * Format 3: For Aikido society only. Will be removed when they change their format to defaukt.
+    * We currently train in the Brandrigg Room of Cartmel College:
+    *   Wednesdays 18:00-20:00
+    *   Saturdays 10:00-12:00
+    */
+    public function format_aikido($string, $input_line){
+
+        preg_match("/(".$string."[s?])[,|:|\s]*(\d*[.|:]\d*-\d*[.|:]\d*)[^-|<|(]*/i", $input_line, $output);
+
+        if(empty($output)) return;
+
+        $day = new \stdClass();
+        $day->location = $this->helper->dictionary($input_line);
+        $day->start = preg_split('/-/', $output[2])[0];
+        $day->end = preg_split('/-/', $output[2])[1];
+
+        return $day;
+        
+
+
+    }
+
 
     /*
     * @return offsfet number

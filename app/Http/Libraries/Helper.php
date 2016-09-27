@@ -50,13 +50,20 @@ class Helper
         unset($json->configure_group_email);
     }
 
-    public function dictionary(){
+    public function dictionary($input){
         $dict = [
-            'george',
-            'brandrigg',
-            'cartmel',
+            'George Fox',
+            'Brandrigg Room',
+            'Cartmel',
         ];
-        return $dict;
+
+        foreach($dict as $key=>$place){
+            if(preg_match("/".$place."/i", $input, $output_array)){
+                return $place;
+            };
+        }
+        return;
+        // return $dict;
     }
 
     /*
