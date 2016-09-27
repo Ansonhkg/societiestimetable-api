@@ -150,8 +150,21 @@ class SocietyController extends Controller{
                 $slot->id = $society->id;
                 $slot->name = $society->name;
                 $slot->img = $society->img;
-                $slot->start = preg_split('/-/', $day->time)[0];
-                $slot->end = preg_split('/-/', $day->time)[1];
+                // $slot->day = $day->day;
+
+                $start = preg_split('/-/', $day->time)[0];
+                $end = preg_split('/-/', $day->time)[1];
+
+                $slot->start = $start;
+                $slot->end = $end;
+
+                // Starts  -- TEMPORARY FOR BELLY DANCING SOCIETY: WILL BE REMOVED UNTIL THEY CHANGE TO PROPER FORMAT
+                if(preg_match("/[pm|am]/i", $slot->end)){
+                    $slot->start = self::converttime($start);
+                    $slot->end = self::converttime($end);
+                }
+                // End  -- TEMPORARY FOR BELLY DANCING SOCIETY: WILL BE REMOVED UNTIL THEY CHANGE TO PROPER FORMAT
+                
                 $slot->location = $day->location;
 
                 //Put slots into days
@@ -336,17 +349,45 @@ class SocietyController extends Controller{
     * Monday, 14:00-16:00, Georege Fox
     */
     public function getDay($string, $input_line){
-        
-        preg_match("/(".$string.")[,|:].(\d*:\d*-\d*:\d*),.([^-]*)/", $input_line, $output);
-        
-        if(empty($output)) return;
 
         $day = new \stdClass();
+
+        // First format: Monday 20:00-22:00, Playroom, Great Hall
+        preg_match("/(".$string.")[,|:|\s]*(\d*[.|:]\d*-\d*[.|:]\d*),.([^-|<|(]*)/i", $input_line, $output);
+        
+        // Starts  -- TEMPORARY FOR BELLY DANCING SOCIETY: WILL BE REMOVED UNTIL THEY CHANGE TO PROPER FORMAT
+        // Second format: Monday: 8-10 pm @ Great Hall A35
+        preg_match("/(".$string.")[,|:|\s]*(\d*[^abc|0-9]\d*[.|\s][am|pm]*)[.|\s]*@[.|\s]([^-|]*)/i", $input_line, $format2);
+        
+        if($format2){
+            // $day->day = $format2[1];
+            $day->time = $format2[2];
+            $day->location = $format2[3];
+            return $day;
+        }
+        // Ends -- TEMPORARY FOR BELLY DANCING SOCIETY: WILL BE REMOVED UNTIL THEY CHANGE TO PROPER FORMAT
+
+        if(empty($output)) return;
+
+        
         // $day->day = $output[1];
         $day->time = $output[2];
         $day->location = preg_split("/</", $output[3])[0];
 
         return $day;
+    }
+    
+    //TEMPORARY FOR BELLY DANCING SOCIETY: WILL BE REMOVED UNTIL THEY CHANGE TO PROPER FORMAT
+    public function converttime($number){
+
+        $number = intval($number);
+
+        for($i = 0; $i<12; $i++){
+        if($number == $i) return strval($number + 12) . ':00';	
+        }
+        
+        if($number == 12) return strval(12) . ':00';
+        
     }
 
     /*
