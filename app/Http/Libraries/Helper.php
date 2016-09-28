@@ -54,7 +54,7 @@ class Helper
         $dict = [
             'George Fox',
             'Brandrigg Room',
-            'Cartmel',
+            'Cartmel'
         ];
 
         foreach($dict as $key=>$place){

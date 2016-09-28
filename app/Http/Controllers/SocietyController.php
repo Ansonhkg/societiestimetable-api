@@ -288,10 +288,13 @@ class SocietyController extends Controller{
         if($format_default = self::format_default($string, $input_line)) return $format_default;
 
         // Monday: 8-10 pm @ Great Hall A35
-        if($format_2 = self::format_2($string, $input_line)) return $format_2;
+        if($format_belly = self::format_belly($string, $input_line)) return $format_belly;
 
         // Wednesdays 18:00-20:00
         if($format_aikido = self::format_aikido($string, $input_line)) return $format_aikido;
+
+        // Tuesday 8-10pm
+        if($format_folk = self::format_folk($string, $input_line)) return $format_folk;
 
         return;
     }
@@ -321,7 +324,7 @@ class SocietyController extends Controller{
     * Format 2: For belly dancing society only. will be removed when they change their format to default
     * Monday: 8-10 pm @ Great Hall A35
     */
-    public function format_2($string, $input_line){
+    public function format_belly($string, $input_line){
 
         preg_match("/(".$string.")[,|:|\s]*(\d*[^abc|0-9]\d*[.|\s][am|pm]*)[.|\s]*@[.|\s]([^-|]*)/i", $input_line, $output);
         
@@ -359,8 +362,27 @@ class SocietyController extends Controller{
         $day->end = preg_split('/-/', $output[2])[1];
 
         return $day;
-        
+    
+    }
 
+    // Tuesday 8-10pm
+    public function format_folk($string, $input_line){
+
+        preg_match("/(".$string."[s?])[^\d]*(\d*-\d*[am|pm]*)/i", $input_line, $output);
+
+        if(empty($output)) return;
+        $day = new \stdClass();
+        $day->location = 'View More';
+        
+        $day->start = preg_split('/-/', $output[2])[0];
+        $day->end = preg_split('/-/', $output[2])[1];
+
+        if(preg_match("/[pm|am]/i", $day->end)){
+            $day->start = $this->helper->converttime($day->start);
+            $day->end = $this->helper->converttime($day->end);
+        }
+
+        return $day;
 
     }
 
