@@ -24,11 +24,11 @@ class SocietyController extends Controller{
         $this->thread = new Thread();
 
         //Local
-        // $this->url = url('/') . '/api/v1/';
+        $this->url = url('/') . '/api/v1/';
         $this->cache_on = false;
 
         //Production
-        $this->url = url('/') . '/';
+        // $this->url = url('/') . '/';
         // $this->cache_on = true;
     }
 
@@ -77,34 +77,34 @@ class SocietyController extends Controller{
     * Get the whole raw list of societies with its information
     * @return Societies JSON
     */
-    // public function getSocietiesRaw(){
+    public function getSocietiesRaw(){
 
-    //     //If it has cache, use cache instead
-    //     if(Cache::has('rawlist') && $this->cache_on)
-    //         return response()->json(Cache::get('rawlist'));
+        //If it has cache, use cache instead
+        if(Cache::has('rawlist') && $this->cache_on)
+            return response()->json(Cache::get('rawlist'));
 
-    //     $urls = self::getUrls();
+        $urls = self::getUrls();
         
-    //     $results = $this->thread->multiple($urls);
+        $results = $this->thread->multiple($urls);
 
-    //     $societies = [];
+        $societies = [];
 
-    //     foreach($results as $r){
-    //         $json = (object) json_decode($r, true);
+        foreach($results as $r){
+            $json = (object) json_decode($r, true);
             
-    //         //Ignore null objects
-    //         if(is_null($json)) continue;
+            //Ignore null objects
+            if(is_null($json)) continue;
 
-    //         $societies[] = $json;
-    //     }
+            $societies[] = $json;
+        }
 
-    //     // Cache expires after 60 mins
-    //     if($this->cache_on){
-    //         Cache::put('rawlist', $societies, 1);
-    //     }
+        // Cache expires after 60 mins
+        if($this->cache_on){
+            Cache::put('rawlist', $societies, 1);
+        }
 
-    //     return response()->json($societies);
-    // }
+        return response()->json($societies);
+    }
 
     /*
     * API: /societies/{id}
