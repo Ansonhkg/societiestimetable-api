@@ -12,23 +12,23 @@
 */
 
 $app->get('/', function() use ($app) {
-    return "Restful API yo~ isn't it cool!? :D)";
+    return "Hi.......... ......... ........ ....... ...... ..... .... ... .. .";
 });
  
-$app->group(['prefix' => 'api/v1','namespace' => 'App\Http\Controllers'], function($app)
+$app->group(['prefix' => '/','namespace' => 'App\Http\Controllers'], function($app)
 {
     $app->get('/societies',          'SocietyController@getSocieties');
     
-    $app->get('/societies/raw',      'SocietyController@getSocietiesRaw');
+    // $app->get('/societies/raw',      'SocietyController@getSocietiesRaw');
 
     $app->get('/societies/{id}',     'SocietyController@getSociety');
     
     $app->get('/urls',               'SocietyController@getUrlsJSON');
-    
+        
     $app->get('/timetable',          'SocietyController@timetable');
 
     $app->get('/timetable/{option}', 'SocietyController@timetable');
     
-    $app->get('/mock',               'MockController@getMock');
-    
+    // $app->get('/mock',               'MockController@getMock');
+
 });

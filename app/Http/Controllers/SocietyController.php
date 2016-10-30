@@ -5,10 +5,33 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Facades\Cache;
 
 use App\Http\Controllers\Controller;
+
+use App\Http\Libraries\Helper;
+use App\Http\Libraries\Thread;
+
 use Illuminate\Http\Request;
 
 class SocietyController extends Controller{
     
+    private $helper;
+    private $thread;
+    private $url;
+    private $cache_on;
+    
+    public function __construct()
+    {
+        $this->helper = new Helper();
+        $this->thread = new Thread();
+
+        //Local
+        // $this->url = url('/') . '/api/v1/';
+        $this->cache_on = false;
+
+        //Production
+        $this->url = url('/') . '/';
+        // $this->cache_on = true;
+    }
+
     /*------------------------------ APIS STARTS ------------------------------
     /*
     * API: /societies
@@ -18,12 +41,12 @@ class SocietyController extends Controller{
     public function getSocieties(){
 
         //If it has cache, use cache instead
-        // if(Cache::has('list'))
-        //     return response()->json(Cache::get('list'));
+        if(Cache::has('list') && $this->cache_on)
+            return response()->json(Cache::get('list'));
 
         $urls = self::getUrls();
         
-        $results = self::multi_thread_request($urls);
+        $results = $this->thread->multiple($urls);
 
         $societies = [];
 
@@ -34,13 +57,15 @@ class SocietyController extends Controller{
             if(is_null($json)) continue;
 
             //Default remove unwanted propeties
-            $json = self::necessities($json);
+            $json = self::getNecessities($json);
                 
             $societies[] = $json;
         }
 
         //Cache expires after 60 mins
-        // Cache::put('list', $societies, 1);
+        if($this->cache_on){
+            Cache::put('list', $societies, 1);
+        }
 
         return response()->json($societies);
 
@@ -52,32 +77,34 @@ class SocietyController extends Controller{
     * Get the whole raw list of societies with its information
     * @return Societies JSON
     */
-    public function getSocietiesRaw(){
+    // public function getSocietiesRaw(){
 
-        //If it has cache, use cache instead
-        if(Cache::has('rawlist'))
-            return response()->json(Cache::get('rawlist'));
+    //     //If it has cache, use cache instead
+    //     if(Cache::has('rawlist') && $this->cache_on)
+    //         return response()->json(Cache::get('rawlist'));
 
-        $urls = self::getUrls();
+    //     $urls = self::getUrls();
         
-        $results = self::multi_thread_request($urls);
+    //     $results = $this->thread->multiple($urls);
 
-        $societies = [];
+    //     $societies = [];
 
-        foreach($results as $r){
-            $json = (object) json_decode($r, true);
+    //     foreach($results as $r){
+    //         $json = (object) json_decode($r, true);
             
-            //Ignore null objects
-            if(is_null($json)) continue;
+    //         //Ignore null objects
+    //         if(is_null($json)) continue;
 
-            $societies[] = $json;
-        }
+    //         $societies[] = $json;
+    //     }
 
-        // Cache expires after 60 mins
-        Cache::put('rawlist', $societies, 1);
+    //     // Cache expires after 60 mins
+    //     if($this->cache_on){
+    //         Cache::put('rawlist', $societies, 1);
+    //     }
 
-        return response()->json($societies);
-    }
+    //     return response()->json($societies);
+    // }
 
     /*
     * API: /societies/{id}
@@ -86,7 +113,7 @@ class SocietyController extends Controller{
     */
     public function getSociety($id){
 
-        $json = file_get_contents(url('/') . '/api/v1/societies');
+        $json = file_get_contents($this->url . 'societies');
         $json = json_decode($json);
         
         //Putting the object in the array avoid escaping special characeters and quotes
@@ -139,7 +166,7 @@ class SocietyController extends Controller{
             6 => 'Sunday'
         ];
 
-        $json = file_get_contents(url('/') . '/api/v1/' . $option);
+        $json = file_get_contents($this->url . $option);
         
         $societies = json_decode($json);
 
@@ -148,10 +175,11 @@ class SocietyController extends Controller{
             foreach($society->days as $index => $day){
                 $slot = new \stdClass();
                 $slot->id = $society->id;
+                $slot->url = 'http://www.lusu.co.uk/groups/' . $society->slug;
                 $slot->name = $society->name;
                 $slot->img = $society->img;
-                $slot->start = preg_split('/-/', $day->time)[0];
-                $slot->end = preg_split('/-/', $day->time)[1];
+                $slot->start = $day->start;
+                $slot->end = $day->end;
                 $slot->location = $day->location;
 
                 //Put slots into days
@@ -165,7 +193,7 @@ class SocietyController extends Controller{
         
         //Sort by start day in ascd order
         foreach($timetable as $key=>$day){
-            usort($day, [$this, "sortByStartTime"]);
+            usort($day, [$this->helper, "sortByStartTime"]);
             $timetable[$key] = $day;
         }
 
@@ -173,12 +201,6 @@ class SocietyController extends Controller{
 
     }
     /*------------------------------ APIS ENDS ------------------------------*/
-
-    private static function sortByStartTime($a, $b){
-        $a = explode(':', $a->start)[0];
-        $b = explode(':', $b->start)[0];
-        return strcmp($a, $b);
-    }
     
 
     /*------------------------------ METHODS ------------------------------*/
@@ -190,7 +212,7 @@ class SocietyController extends Controller{
         
         $domain = 'http://lusu.co.uk/groups/';
         $temp   = [];
-        $pages  = 22;
+        $pages  = 31;
     
         $requestlist = [];
         
@@ -201,14 +223,14 @@ class SocietyController extends Controller{
         }
         
         //Results contains the whole list of societies' slug
-        $results = self::multi_thread_request($requestlist, 'XMLHttpRequest');
+        $results = $this->thread->multiple($requestlist, 'XMLHttpRequest');
         
         foreach($results as $slugs){
             
             foreach(self::extract($slugs) as $slug){
                 
                 //Remove any short name that contains special characters
-                if(!self::isValid($slug)) continue;
+                if(!$this->helper->isValid($slug)) continue;
 
                 array_push($temp, $domain . $slug . '.json');
                 
@@ -218,90 +240,18 @@ class SocietyController extends Controller{
 
     }
 
-    /*
-    * Return multiple page requests
-    * @Param Nodes $nodes The number of nodes
-    * @Param Method $method Whether to use XMLHttpRequest as header
-    */
-    public function multi_thread_request($nodes, $header=''){
-        
-        $mh = curl_multi_init(); 
-        $curl_array = array();
-        $res = array();
-        $size = sizeof($nodes);
-        
-        for($i=0;$i<$size;$i++){
-            $curl_array[$i] = curl_init($nodes[$i]); 
-            curl_setopt($curl_array[$i],CURLOPT_FOLLOWLOCATION,true);
-            curl_setopt($curl_array[$i], CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($curl_array[$i], CURLOPT_CONNECTTIMEOUT, 10);
-            curl_setopt($curl_array[$i], CURLOPT_TIMEOUT, 10);
-
-            if($header == 'XMLHttpRequest')
-                curl_setopt($curl_array[$i], CURLOPT_HTTPHEADER, array('x-requested-with: XMLHttpRequest'));
-
-            curl_multi_add_handle($mh, $curl_array[$i]); 
-        } 
-
-        $active = NULL; 
-        
-        do { 
-            // usleep(500); 
-            curl_multi_exec($mh, $active); 
-        } while($active > 0); 
-
-
-        for($i=0;$i<$size;$i++)
-            $res[$i] = curl_multi_getcontent($curl_array[$i]);
-        
-        for($i=0;$i<$size;$i++)
-            curl_multi_remove_handle($mh, $curl_array[$i]); 
-        
-        curl_multi_close($mh);        
-        return $res; 
-    } 
-
-
     /*------------------------------ LIBRARIES ------------------------------*/
-    public function necessities($json){
-        unset($json->slug);
-        unset($json->nextofkin_required);
-        unset($json->over_eighteenid);
-        unset($json->member_approval_requiredid);
-        unset($json->member_visibility);
-        unset($json->max_subscription_years);
-        unset($json->image_content_type);
-        unset($json->image_file_size);
-        unset($json->group_type_id);
-        unset($json->union_id);
-        unset($json->asset_id);
-        unset($json->created_at);
-        unset($json->updated_at);
-        unset($json->workflow_state);
-        unset($json->over_eighteen);
-        unset($json->member_approval_required);
-        unset($json->display_name);
-        unset($json->image_processing);
-        unset($json->cms_draft);
-        unset($json->articles_draft);
-        unset($json->nominal_code);
-        unset($json->display_as_subsite);
-        unset($json->act_as_subsite);
-        unset($json->page_id);
-        unset($json->is_bespoke_subsite);
-        unset($json->group_membership_expiry_date);
-        unset($json->group_terms_and_conditions);
-        unset($json->has_overridden_terms_and_conditions);
-        unset($json->file_generated_at);
+    public function getNecessities($json){
 
         $json->img = self::getSocietyLogo($json);
-        unset($json->image_file_name);
 
         $json->email = $json->configure_group_email;
-        unset($json->configure_group_email);
 
         $json->description = addslashes($json->description);
         $json->days = self::getDates($json->description);
+
+        $this->helper->unsets($json);
+
         return $json;
     }
 
@@ -332,22 +282,113 @@ class SocietyController extends Controller{
     /*
     * @return (object) day
     * Extract Times and Location from string with the following format
-    * DAY, HH:MM-HH:MM, LOCATION
-    * Monday, 14:00-16:00, Georege Fox
     */
     public function getDay($string, $input_line){
         
-        preg_match("/(".$string.")[,|:].(\d*:\d*-\d*:\d*),.([^-]*)/", $input_line, $output);
+        // Monday, 14:00-16:00, Georege Fox
+        if($format_default = self::format_default($string, $input_line)) return $format_default;
+
+        // Monday: 8-10 pm @ Great Hall A35
+        if($format_belly = self::format_belly($string, $input_line)) return $format_belly;
+
+        // Wednesdays 18:00-20:00
+        if($format_aikido = self::format_aikido($string, $input_line)) return $format_aikido;
+
+        // Tuesday 8-10pm
+        // if($format_folk = self::format_folk($string, $input_line)) return $format_folk;
+
+        return;
+    }
+    
+    //--------- Formats ----------//
+    /*
+    * Default format
+    * DAY, HH:MM-HH:MM, LOCATION
+    * Monday, 14:00-16:00, Georege Fox
+    */
+    public function format_default($string, $input_line){
+
+        preg_match("/(".$string.")[,|:|\s]*(\d*[.|:]\d*-\d*[.|:]\d*),.([^-|<|(]*)/i", $input_line, $output);
         
         if(empty($output)) return;
 
         $day = new \stdClass();
-        // $day->day = $output[1];
-        $day->time = $output[2];
         $day->location = preg_split("/</", $output[3])[0];
+
+        $day->start = preg_split('/-/', $output[2])[0];
+        $day->end = preg_split('/-/', $output[2])[1];
 
         return $day;
     }
+
+    /*
+    * Format 2: For belly dancing society only. will be removed when they change their format to default
+    * Monday: 8-10 pm @ Great Hall A35
+    */
+    public function format_belly($string, $input_line){
+
+        preg_match("/(".$string.")[,|:|\s]*(\d*[^abc|0-9]\d*[.|\s][am|pm]*)[.|\s]*@[.|\s]([^-|]*)/i", $input_line, $output);
+        
+        if(empty($output)) return;
+
+        $day = new \stdClass();
+        $day->location = $output[3];
+
+        $day->start = preg_split('/-/', $output[2])[0];
+        $day->end = preg_split('/-/', $output[2])[1];
+        
+        if(preg_match("/[pm|am]/i", $day->end)){
+            $day->start = $this->helper->converttime($day->start);
+            $day->end = $this->helper->converttime($day->end);
+        }
+
+        return $day;
+    }
+
+    /*
+    * Format 3: For Aikido society only. Will be removed when they change their format to defaukt.
+    * We currently train in the Brandrigg Room of Cartmel College:
+    *   Wednesdays 18:00-20:00
+    *   Saturdays 10:00-12:00
+    */
+    public function format_aikido($string, $input_line){
+
+        preg_match("/(".$string."[s?])[,|:|\s]*(\d*[.|:]\d*-\d*[.|:]\d*)[^-|<|(]*/i", $input_line, $output);
+
+        if(empty($output)) return;
+
+        $day = new \stdClass();
+        $day->location = $this->helper->dictionary($input_line);
+        $day->start = preg_split('/-/', $output[2])[0];
+        $day->end = preg_split('/-/', $output[2])[1];
+
+        return $day;
+    
+    }
+
+    // Tuesday 8-10pm
+    // public function format_folk($string, $input_line){
+
+    //     $input_line = strip_tags($input_line);
+
+    //     preg_match("/(".$string.")[s?][^\d]*(\d*-\d*[am|pm]*)/i", $input_line, $output);
+
+    //     if(empty($output[2])) return;
+    //     $day = new \stdClass();
+    //     $day->location = 'Click to View More';
+        
+    //     $day->start = preg_split('/-/', $output[2])[0];
+    //     $day->end = preg_split('/-/', $output[2])[1];
+
+    //     if(preg_match("/[pm|am]/i", $day->end)){
+    //         $day->start = $this->helper->converttime($day->start);
+    //         $day->end = $this->helper->converttime($day->end);
+    //     }
+
+    //     return $day;
+
+    // }
+
 
     /*
     * @return offsfet number
@@ -363,13 +404,6 @@ class SocietyController extends Controller{
     */
     public function offsetUrl($offset){
         return 'http://lusu.co.uk/groups/more_groups?offset='.$offset.'&group_type=1';
-    }
-
-    /*
-    * Check if it contains special characters
-    */
-    public function isValid($str) {
-        return !preg_match('/[^A-Za-z0-9.#\\-$]/', $str);
     }
 
     /*
